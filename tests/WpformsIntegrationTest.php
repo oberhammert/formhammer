@@ -36,10 +36,13 @@ final class WpformsIntegrationTest extends TestCase
         $integration->register();
 
         self::assertCount(2, $GLOBALS['formhammer_registered_actions']);
+        self::assertCount(1, $GLOBALS['formhammer_registered_filters']);
         self::assertSame('wpforms_process', $GLOBALS['formhammer_registered_actions'][0]['hook']);
         self::assertSame(3, $GLOBALS['formhammer_registered_actions'][0]['accepted_args']);
         self::assertSame('wpforms_display_submit_before', $GLOBALS['formhammer_registered_actions'][1]['hook']);
         self::assertSame(1, $GLOBALS['formhammer_registered_actions'][1]['accepted_args']);
+        self::assertSame('wpforms_frontend_form_atts', $GLOBALS['formhammer_registered_filters'][0]['hook']);
+        self::assertSame(2, $GLOBALS['formhammer_registered_filters'][0]['accepted_args']);
     }
 
     public function testValidateCallsFormhammerValidateWithWpformsPrefixedFormId(): void
@@ -80,6 +83,16 @@ final class WpformsIntegrationTest extends TestCase
         self::assertStringContainsString($GLOBALS['formhammer_fields_markup'], $output);
     }
 
+    public function testAddFormAttributeMarksWpformsFormForJavascript(): void
+    {
+        $integration = new Formhammer_WPForms_Integration();
+
+        $atts = $integration->add_form_attribute(['atts' => ['class' => 'wpforms-form']], ['id' => 123]);
+
+        self::assertSame('wpforms-form', $atts['atts']['class']);
+        self::assertSame('wpforms-123', $atts['atts']['data-formhammer']);
+    }
+
     public function testValidateSkipsWhenFormMetaTurnsFormhammerOff(): void
     {
         $integration = new Formhammer_WPForms_Integration();
@@ -101,6 +114,16 @@ final class WpformsIntegrationTest extends TestCase
 
         self::assertSame('', $output);
         self::assertSame([], $GLOBALS['formhammer_fields_calls']);
+    }
+
+    public function testAddFormAttributeSkipsWhenFormMetaTurnsFormhammerOff(): void
+    {
+        $integration = new Formhammer_WPForms_Integration();
+        $atts = ['atts' => ['class' => 'wpforms-form']];
+
+        $returned = $integration->add_form_attribute($atts, ['id' => 123, 'meta' => ['formhammer' => 'off']]);
+
+        self::assertSame($atts, $returned);
     }
 
     public function testValidateBlocksSubmissionOnRejectVerdict(): void

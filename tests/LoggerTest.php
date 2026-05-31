@@ -12,12 +12,14 @@ final class LoggerTest extends TestCase
         $GLOBALS['formhammer_registered_actions'] = [];
         $GLOBALS['formhammer_scheduled_events'] = [];
         $GLOBALS['formhammer_scheduled_event_meta'] = [];
+        $GLOBALS['formhammer_dbdelta_calls'] = [];
     }
 
     public function testRegisterSchedulesDailyCleanup(): void
     {
+        $wpdb = new Formhammer_Test_Wpdb();
         $logger = new Formhammer_Logger(
-            wpdb: new Formhammer_Test_Wpdb(),
+            wpdb: $wpdb,
             clock: static fn (): int => 1_700_000_000
         );
 
@@ -27,6 +29,9 @@ final class LoggerTest extends TestCase
         self::assertSame('formhammer_log_cleanup', $GLOBALS['formhammer_registered_actions'][0]['hook']);
         self::assertSame(1_700_000_000, $GLOBALS['formhammer_scheduled_events']['formhammer_log_cleanup']);
         self::assertSame('daily', $GLOBALS['formhammer_scheduled_event_meta']['formhammer_log_cleanup']['recurrence']);
+        self::assertCount(1, $GLOBALS['formhammer_dbdelta_calls']);
+        self::assertStringContainsString('CREATE TABLE wp_formhammer_log', $GLOBALS['formhammer_dbdelta_calls'][0]);
+        self::assertStringContainsString('DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_520_ci', $GLOBALS['formhammer_dbdelta_calls'][0]);
     }
 
     public function testLogWritesMinimalEntryWhenEnabled(): void
@@ -61,6 +66,17 @@ final class LoggerTest extends TestCase
         $logger->log('cf7-12', Formhammer_Validation_Result::pass('pass'));
 
         self::assertSame([], $wpdb->inserts);
+        $GLOBALS['formhammer_test_options']['formhammer_log_enabled'] = true;
+        $wpdb = new Formhammer_Test_Wpdb();
+        $wpdb->count_result = 1000;
+        $logger = new Formhammer_Logger(
+            wpdb: $wpdb,
+            clock: static fn (): int => 1_700_000_000
+        );
+
+        $logger->log('cf7-12', Formhammer_Validation_Result::block('score_threshold_block', 40));
+
+        self::assertSame([], $wpdb->inserts);
     }
 
     public function testCleanupDeletesEntriesOlderThanRetentionWindow(): void
@@ -85,8 +101,11 @@ final class LoggerTest extends TestCase
 final class Formhammer_Test_Wpdb
 {
     public string $prefix = 'wp_';
+    public string $charset = 'utf8mb4';
+    public string $collate = 'utf8mb4_unicode_520_ci';
     public array $inserts = [];
     public array $queries = [];
+    public int|string $count_result = 0;
 
     public function insert(string $table, array $data, array $formats = []): int
     {
@@ -109,5 +128,17 @@ final class Formhammer_Test_Wpdb
     public function prepare(string $query, string $value): string
     {
         return str_replace('%s', "'" . $value . "'", $query);
+    }
+
+    public function get_charset_collate(): string
+    {
+        return 'DEFAULT CHARACTER SET ' . $this->charset . ' COLLATE ' . $this->collate;
+    }
+
+    public function get_var(string $query): int|string
+    {
+        $this->queries[] = $query;
+
+        return $this->count_result;
     }
 }

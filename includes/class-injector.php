@@ -2,6 +2,10 @@
 
 declare(strict_types=1);
 
+if (!defined('ABSPATH')) {
+    exit;
+}
+
 final class Formhammer_Injector
 {
     private const HONEYPOT_WRAPPER_CLASS = 'formhammer-hp';

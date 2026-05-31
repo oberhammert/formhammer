@@ -1,0 +1,18 @@
+[33m⚠[39m Warning: could not find a .wp-env.json configuration file and could not determine if '/Users/tobias/hammerlock' is a WordPress installation, a plugin, or a theme.
+[33m⚠[39m Warning: could not find a .wp-env.json configuration file and could not determine if '/Users/tobias/hammerlock' is a WordPress installation, a plugin, or a theme.
+- Reading configuration.
+- Reading configuration.
+[33m⚠[39m Warning: wp-env starts both development and tests environments by default.
+This behavior is deprecated and will be removed in a future version.
+To avoid this warning, add "testsEnvironment": false to your .wp-env.json.
+The "env", "testsPort", and "testsEnvironment" options are also deprecated.
+Use the --config option with a separate config file for test environments instead.
+
+- Reading configuration.
+[33m⚠[39m Warning: wp-env starts both development and tests environments by default.
+This behavior is deprecated and will be removed in a future version.
+To avoid this warning, add "testsEnvironment": false to your .wp-env.json.
+The "env", "testsPort", and "testsEnvironment" options are also deprecated.
+Use the --config option with a separate config file for test environments instead.
+
+- Reading configuration.

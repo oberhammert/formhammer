@@ -2,6 +2,10 @@
 
 declare(strict_types=1);
 
+if (!defined('ABSPATH')) {
+    exit;
+}
+
 final class Formhammer_Gravity_Forms_Integration
 {
     public function register(): void
@@ -12,6 +16,7 @@ final class Formhammer_Gravity_Forms_Integration
 
         add_filter('gform_validation', [$this, 'validate'], 10, 2);
         add_filter('gform_get_form_filter', [$this, 'inject_fields'], 10, 2);
+        add_filter('gform_form_tag', [$this, 'add_form_attribute'], 10, 2);
     }
 
     public function validate(array $validation_result, string $context): array
@@ -57,6 +62,17 @@ final class Formhammer_Gravity_Forms_Integration
         }
 
         return $form_string . $fields;
+    }
+
+    public function add_form_attribute(string $form_tag, array|object $form): string
+    {
+        if ($form_tag === '' || $this->is_opted_out($form) || str_contains($form_tag, 'data-formhammer=')) {
+            return $form_tag;
+        }
+
+        $attribute = htmlspecialchars($this->form_id($form), ENT_QUOTES, 'UTF-8');
+
+        return preg_replace('/<form\b([^>]*)>/i', '<form$1 data-formhammer="' . $attribute . '">', $form_tag, 1) ?? $form_tag;
     }
 
     private function form_id(array|object $value): string

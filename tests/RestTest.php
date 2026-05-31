@@ -11,6 +11,8 @@ final class RestTest extends TestCase
     protected function setUp(): void
     {
         $GLOBALS['formhammer_registered_rest_routes'] = [];
+        $GLOBALS['formhammer_test_transients'] = [];
+        $_SERVER['REMOTE_ADDR'] = '203.0.113.10';
     }
 
     public function testRegisterRoutesRegistersTokenEndpoint(): void
@@ -34,11 +36,28 @@ final class RestTest extends TestCase
         $request = new WP_REST_Request(['form_id' => 'contact-form-1']);
 
         $response = $rest->handle_token_request($request);
+        $data = $this->response_data($response);
 
-        self::assertIsArray($response);
-        self::assertArrayHasKey('token', $response);
-        self::assertIsString($response['token']);
-        self::assertTrue($validator->verify_token($response['token'], 'contact-form-1')->is_valid());
+        self::assertIsArray($data);
+        self::assertArrayHasKey('token', $data);
+        self::assertIsString($data['token']);
+        self::assertTrue($validator->verify_token($data['token'], 'contact-form-1')->is_valid());
+    }
+
+    public function testHandleTokenRequestAddsNoStoreHeaders(): void
+    {
+        $rest = new Formhammer_REST($this->validator());
+        $request = new WP_REST_Request(['form_id' => 'contact_form-1']);
+
+        $response = $rest->handle_token_request($request);
+
+        self::assertInstanceOf(WP_REST_Response::class, $response);
+        self::assertSame(
+            'no-store, no-cache, must-revalidate, max-age=0',
+            $response->get_headers()['Cache-Control']
+        );
+        self::assertSame('no-cache', $response->get_headers()['Pragma']);
+        self::assertSame('0', $response->get_headers()['Expires']);
     }
 
     public function testHandleTokenRequestGeneratesNewTokenOnEachCall(): void
@@ -59,10 +78,12 @@ final class RestTest extends TestCase
 
         $first = $rest->handle_token_request($request);
         $second = $rest->handle_token_request($request);
+        $firstData = $this->response_data($first);
+        $secondData = $this->response_data($second);
 
-        self::assertIsArray($first);
-        self::assertIsArray($second);
-        self::assertNotSame($first['token'], $second['token']);
+        self::assertIsArray($firstData);
+        self::assertIsArray($secondData);
+        self::assertNotSame($firstData['token'], $secondData['token']);
     }
 
     public function testHandleTokenRequestRejectsMissingFormId(): void
@@ -73,7 +94,7 @@ final class RestTest extends TestCase
         $response = $rest->handle_token_request($request);
 
         self::assertInstanceOf(WP_Error::class, $response);
-        self::assertSame('formhammer_missing_form_id', $response->get_error_code());
+        self::assertSame('formhammer_invalid_form_id', $response->get_error_code());
         self::assertSame(['status' => 400], $response->get_error_data());
     }
 
@@ -85,7 +106,58 @@ final class RestTest extends TestCase
         $response = $rest->handle_token_request($request);
 
         self::assertInstanceOf(WP_Error::class, $response);
-        self::assertSame('formhammer_missing_form_id', $response->get_error_code());
+        self::assertSame('formhammer_invalid_form_id', $response->get_error_code());
+    }
+
+    public function testHandleTokenRequestRejectsInvalidFormIdCharacters(): void
+    {
+        $rest = new Formhammer_REST($this->validator());
+        $request = new WP_REST_Request(['form_id' => 'contact/form']);
+
+        $response = $rest->handle_token_request($request);
+
+        self::assertInstanceOf(WP_Error::class, $response);
+        self::assertSame('formhammer_invalid_form_id', $response->get_error_code());
+        self::assertSame(['status' => 400], $response->get_error_data());
+    }
+
+    public function testHandleTokenRequestRejectsFormIdLongerThanOneHundredCharacters(): void
+    {
+        $rest = new Formhammer_REST($this->validator());
+        $request = new WP_REST_Request(['form_id' => str_repeat('a', 101)]);
+
+        $response = $rest->handle_token_request($request);
+
+        self::assertInstanceOf(WP_Error::class, $response);
+        self::assertSame('formhammer_invalid_form_id', $response->get_error_code());
+    }
+
+    public function testHandleTokenRequestAllowsAlphanumericDashAndUnderscoreFormIds(): void
+    {
+        $validator = $this->validator();
+        $rest = new Formhammer_REST($validator);
+        $request = new WP_REST_Request(['form_id' => 'Contact_123-form']);
+
+        $response = $rest->handle_token_request($request);
+        $data = $this->response_data($response);
+
+        self::assertTrue($validator->verify_token($data['token'], 'Contact_123-form')->is_valid());
+    }
+
+    public function testHandleTokenRequestRateLimitsByIpAfterTenRequestsPerMinute(): void
+    {
+        $rest = new Formhammer_REST($this->validator());
+        $request = new WP_REST_Request(['form_id' => 'contact-form-1']);
+
+        for ($i = 0; $i < 10; $i++) {
+            self::assertNotInstanceOf(WP_Error::class, $rest->handle_token_request($request));
+        }
+
+        $response = $rest->handle_token_request($request);
+
+        self::assertInstanceOf(WP_Error::class, $response);
+        self::assertSame('formhammer_rate_limit_exceeded', $response->get_error_code());
+        self::assertSame(['status' => 429], $response->get_error_data());
     }
 
     private function validator(int $now = 1_700_000_000): Formhammer_Validator
@@ -96,5 +168,16 @@ final class RestTest extends TestCase
             clock: static fn (): int => $now,
             random_bytes: static fn (int $length): string => str_repeat('a', $length)
         );
+    }
+
+    private function response_data(mixed $response): array
+    {
+        if ($response instanceof WP_REST_Response) {
+            return $response->get_data();
+        }
+
+        self::assertIsArray($response);
+
+        return $response;
     }
 }

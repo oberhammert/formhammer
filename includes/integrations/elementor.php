@@ -2,6 +2,10 @@
 
 declare(strict_types=1);
 
+if (!defined('ABSPATH')) {
+    exit;
+}
+
 final class Formhammer_Elementor_Integration
 {
     public function register(): void
@@ -12,6 +16,7 @@ final class Formhammer_Elementor_Integration
 
         add_action('elementor_pro/forms/validation', [$this, 'validate'], 10, 2);
         add_action('elementor_pro/forms/render_field/after', [$this, 'inject_fields'], 10, 4);
+        add_filter('elementor/widget/render_content', [$this, 'add_form_attribute'], 10, 2);
     }
 
     public function validate(object $record, object $ajax_handler): void
@@ -34,6 +39,22 @@ final class Formhammer_Elementor_Integration
         }
 
         formhammer_fields($this->render_form_id($form));
+    }
+
+    public function add_form_attribute(string $content, object $widget): string
+    {
+        if (
+            !method_exists($widget, 'get_name')
+            || $widget->get_name() !== 'form'
+            || $this->is_opted_out($widget)
+            || str_contains($content, 'data-formhammer=')
+        ) {
+            return $content;
+        }
+
+        $attribute = htmlspecialchars($this->render_form_id($widget), ENT_QUOTES, 'UTF-8');
+
+        return preg_replace('/<form\b([^>]*)>/i', '<form$1 data-formhammer="' . $attribute . '">', $content, 1) ?? $content;
     }
 
     private function validation_form_id(object $record): string

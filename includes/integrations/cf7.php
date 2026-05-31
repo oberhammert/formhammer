@@ -2,6 +2,10 @@
 
 declare(strict_types=1);
 
+if (!defined('ABSPATH')) {
+    exit;
+}
+
 final class Formhammer_CF7_Integration
 {
     private object|null $contact_form = null;
@@ -15,6 +19,7 @@ final class Formhammer_CF7_Integration
         add_action('wpcf7_contact_form', [$this, 'capture_contact_form'], 10, 1);
         add_filter('wpcf7_validate', [$this, 'validate'], 20, 2);
         add_filter('wpcf7_form_elements', [$this, 'inject_fields'], 20, 1);
+        add_filter('wpcf7_form_additional_atts', [$this, 'add_form_attribute'], 20, 1);
     }
 
     public function capture_contact_form(object $contact_form): void
@@ -48,6 +53,17 @@ final class Formhammer_CF7_Integration
         $fields = ob_get_clean();
 
         return $html . $fields;
+    }
+
+    public function add_form_attribute(array $atts): array
+    {
+        if ($this->is_opted_out()) {
+            return $atts;
+        }
+
+        $atts['data-formhammer'] = $this->form_id();
+
+        return $atts;
     }
 
     private function form_id(): string

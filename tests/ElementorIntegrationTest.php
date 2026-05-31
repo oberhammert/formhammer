@@ -33,10 +33,13 @@ namespace {
             $integration->register();
 
             self::assertCount(2, $GLOBALS['formhammer_registered_actions']);
+            self::assertCount(1, $GLOBALS['formhammer_registered_filters']);
             self::assertSame('elementor_pro/forms/validation', $GLOBALS['formhammer_registered_actions'][0]['hook']);
             self::assertSame(2, $GLOBALS['formhammer_registered_actions'][0]['accepted_args']);
             self::assertSame('elementor_pro/forms/render_field/after', $GLOBALS['formhammer_registered_actions'][1]['hook']);
             self::assertSame(4, $GLOBALS['formhammer_registered_actions'][1]['accepted_args']);
+            self::assertSame('elementor/widget/render_content', $GLOBALS['formhammer_registered_filters'][0]['hook']);
+            self::assertSame(2, $GLOBALS['formhammer_registered_filters'][0]['accepted_args']);
         }
 
         public function testValidateCallsFormhammerValidateWithElementorPrefixedFormId(): void
@@ -116,6 +119,20 @@ namespace {
             self::assertSame(['elementor-form-123'], $GLOBALS['formhammer_fields_calls']);
         }
 
+        public function testAddFormAttributeMarksElementorFormForJavascript(): void
+        {
+            $integration = new Formhammer_Elementor_Integration();
+            $widget = new Formhammer_Test_ElementorForm('form-123', [], 'form');
+            $content = '<div><form class="elementor-form" method="post"><input></form></div>';
+
+            $returned = $integration->add_form_attribute($content, $widget);
+
+            self::assertSame(
+                '<div><form class="elementor-form" method="post" data-formhammer="elementor-form-123"><input></form></div>',
+                $returned
+            );
+        }
+
         public function testInjectFieldsSkipsNonFirstRenderedItems(): void
         {
             $integration = new Formhammer_Elementor_Integration();
@@ -141,15 +158,32 @@ namespace {
             self::assertSame('', $output);
             self::assertSame([], $GLOBALS['formhammer_fields_calls']);
         }
+
+        public function testAddFormAttributeSkipsWhenCustomFormSettingTurnsFormhammerOff(): void
+        {
+            $integration = new Formhammer_Elementor_Integration();
+            $widget = new Formhammer_Test_ElementorForm('form-123', ['formhammer' => 'off'], 'form');
+            $content = '<form class="elementor-form" method="post"></form>';
+
+            $returned = $integration->add_form_attribute($content, $widget);
+
+            self::assertSame($content, $returned);
+        }
     }
 
     final class Formhammer_Test_ElementorRecord
     {
         public function __construct(
             private string $id,
-            private array $settings = []
+            private array $settings = [],
+            private string $name = ''
         )
         {
+        }
+
+        public function get_name(): string
+        {
+            return $this->name;
         }
 
         public function get_form_settings(string $key): string

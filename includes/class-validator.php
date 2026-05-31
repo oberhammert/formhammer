@@ -2,6 +2,10 @@
 
 declare(strict_types=1);
 
+if (!defined('ABSPATH')) {
+    exit;
+}
+
 final class Formhammer_Validator
 {
     private const SIGNATURE_ALGORITHM = 'sha256';

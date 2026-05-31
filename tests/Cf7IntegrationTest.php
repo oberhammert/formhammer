@@ -32,11 +32,13 @@ final class Cf7IntegrationTest extends TestCase
         $integration->register();
 
         self::assertCount(1, $GLOBALS['formhammer_registered_actions']);
-        self::assertCount(2, $GLOBALS['formhammer_registered_filters']);
+        self::assertCount(3, $GLOBALS['formhammer_registered_filters']);
         self::assertSame('wpcf7_contact_form', $GLOBALS['formhammer_registered_actions'][0]['hook']);
         self::assertSame('wpcf7_validate', $GLOBALS['formhammer_registered_filters'][0]['hook']);
         self::assertSame(2, $GLOBALS['formhammer_registered_filters'][0]['accepted_args']);
         self::assertSame('wpcf7_form_elements', $GLOBALS['formhammer_registered_filters'][1]['hook']);
+        self::assertSame('wpcf7_form_additional_atts', $GLOBALS['formhammer_registered_filters'][2]['hook']);
+        self::assertSame(1, $GLOBALS['formhammer_registered_filters'][2]['accepted_args']);
     }
 
     public function testValidateCallsFormhammerValidateWithCf7PrefixedFormId(): void
@@ -119,6 +121,17 @@ final class Cf7IntegrationTest extends TestCase
         self::assertSame(['cf7-321'], $GLOBALS['formhammer_fields_calls']);
     }
 
+    public function testAddFormAttributeMarksCf7FormForJavascript(): void
+    {
+        $integration = new Formhammer_CF7_Integration();
+        $integration->capture_contact_form(new Formhammer_Test_Cf7ContactForm(321));
+
+        $atts = $integration->add_form_attribute(['class' => 'wpcf7-form']);
+
+        self::assertSame('wpcf7-form', $atts['class']);
+        self::assertSame('cf7-321', $atts['data-formhammer']);
+    }
+
     public function testInjectFieldsSkipsWhenFormShortcodeOptOutIsOff(): void
     {
         $integration = new Formhammer_CF7_Integration();
@@ -128,6 +141,16 @@ final class Cf7IntegrationTest extends TestCase
 
         self::assertSame('<p>Form</p>', $html);
         self::assertSame([], $GLOBALS['formhammer_fields_calls']);
+    }
+
+    public function testAddFormAttributeSkipsWhenFormShortcodeOptOutIsOff(): void
+    {
+        $integration = new Formhammer_CF7_Integration();
+        $integration->capture_contact_form(new Formhammer_Test_Cf7ContactForm(321, 'off'));
+
+        $atts = $integration->add_form_attribute(['class' => 'wpcf7-form']);
+
+        self::assertSame(['class' => 'wpcf7-form'], $atts);
     }
 }
 

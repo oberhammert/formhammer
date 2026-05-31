@@ -2,11 +2,16 @@
 
 declare(strict_types=1);
 
+if (!defined('ABSPATH')) {
+    exit;
+}
+
 final class Formhammer_Logger
 {
     private const CLEANUP_HOOK = 'formhammer_log_cleanup';
     private const DEFAULT_RETENTION_DAYS = 7;
     private const DAY_IN_SECONDS = 86400;
+    private const MAX_ROWS = 1000;
 
     private object|null $wpdb;
     private \Closure $clock;
@@ -38,6 +43,10 @@ final class Formhammer_Logger
     public function log(string $form_id, Formhammer_Validation_Result $result): void
     {
         if (!$this->is_enabled() || $this->wpdb === null || !method_exists($this->wpdb, 'insert')) {
+            return;
+        }
+
+        if ($this->is_at_capacity()) {
             return;
         }
 
@@ -105,15 +114,51 @@ final class Formhammer_Logger
 
     private function create_table(): void
     {
-        if ($this->wpdb === null || !method_exists($this->wpdb, 'query')) {
+        if ($this->wpdb === null) {
             return;
         }
 
-        $this->wpdb->query(
+        if (!function_exists('dbDelta')) {
+            $upgrade_file = ABSPATH . 'wp-admin/includes/upgrade.php';
+
+            if (file_exists($upgrade_file)) {
+                require_once $upgrade_file;
+            }
+        }
+
+        if (!function_exists('dbDelta')) {
+            return;
+        }
+
+        $charset_collate = '';
+
+        if (method_exists($this->wpdb, 'get_charset_collate')) {
+            $charset_collate = ' ' . trim((string) $this->wpdb->get_charset_collate());
+        }
+
+        dbDelta(
             sprintf(
-                'CREATE TABLE IF NOT EXISTS %s (logged_at datetime NOT NULL, form_id varchar(191) NOT NULL, verdict varchar(20) NOT NULL, score int NOT NULL)',
-                $this->table_name()
+                'CREATE TABLE %s (
+                    logged_at datetime NOT NULL,
+                    form_id varchar(191) NOT NULL,
+                    verdict varchar(20) NOT NULL,
+                    score int NOT NULL,
+                    KEY logged_at (logged_at)
+                )%s;',
+                $this->table_name(),
+                $charset_collate
             )
         );
+    }
+
+    private function is_at_capacity(): bool
+    {
+        if ($this->wpdb === null || !method_exists($this->wpdb, 'get_var')) {
+            return false;
+        }
+
+        $count = $this->wpdb->get_var(sprintf('SELECT COUNT(*) FROM %s', $this->table_name()));
+
+        return is_numeric($count) && (int) $count >= self::MAX_ROWS;
     }
 }

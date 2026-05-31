@@ -30,11 +30,13 @@ final class GravityFormsIntegrationTest extends TestCase
 
         $integration->register();
 
-        self::assertCount(2, $GLOBALS['formhammer_registered_filters']);
+        self::assertCount(3, $GLOBALS['formhammer_registered_filters']);
         self::assertSame('gform_validation', $GLOBALS['formhammer_registered_filters'][0]['hook']);
         self::assertSame(2, $GLOBALS['formhammer_registered_filters'][0]['accepted_args']);
         self::assertSame('gform_get_form_filter', $GLOBALS['formhammer_registered_filters'][1]['hook']);
         self::assertSame(2, $GLOBALS['formhammer_registered_filters'][1]['accepted_args']);
+        self::assertSame('gform_form_tag', $GLOBALS['formhammer_registered_filters'][2]['hook']);
+        self::assertSame(2, $GLOBALS['formhammer_registered_filters'][2]['accepted_args']);
     }
 
     public function testValidateCallsFormhammerValidateWithGravityPrefixedFormId(): void
@@ -79,6 +81,16 @@ final class GravityFormsIntegrationTest extends TestCase
         self::assertStringEndsWith('</form>', $returned);
     }
 
+    public function testAddFormAttributeMarksGravityFormForJavascript(): void
+    {
+        $integration = new Formhammer_Gravity_Forms_Integration();
+        $form_tag = '<form id="gform_55" method="post">';
+
+        $returned = $integration->add_form_attribute($form_tag, ['id' => 55]);
+
+        self::assertSame('<form id="gform_55" method="post" data-formhammer="gf-55">', $returned);
+    }
+
     public function testValidateSkipsWhenFormMetaTurnsFormhammerOff(): void
     {
         $integration = new Formhammer_Gravity_Forms_Integration();
@@ -109,6 +121,16 @@ final class GravityFormsIntegrationTest extends TestCase
 
         self::assertSame($form_html, $returned);
         self::assertSame([], $GLOBALS['formhammer_fields_calls']);
+    }
+
+    public function testAddFormAttributeSkipsWhenFormMetaTurnsFormhammerOff(): void
+    {
+        $integration = new Formhammer_Gravity_Forms_Integration();
+        $form_tag = '<form id="gform_55" method="post">';
+
+        $returned = $integration->add_form_attribute($form_tag, ['id' => 55, 'meta' => ['formhammer' => 'off']]);
+
+        self::assertSame($form_tag, $returned);
     }
 
     public function testValidateBlocksSubmissionOnRejectVerdict(): void
