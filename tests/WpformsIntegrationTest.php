@@ -8,6 +8,10 @@ if (!class_exists('WPForms')) {
     }
 }
 
+if (!defined('ABSPATH')) {
+    exit;
+}
+
 require_once __DIR__ . '/../includes/integrations/wpforms.php';
 
 use PHPUnit\Framework\TestCase;

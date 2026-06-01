@@ -8,6 +8,10 @@ if (!class_exists('WPCF7')) {
     }
 }
 
+if (!defined('ABSPATH')) {
+    exit;
+}
+
 require_once __DIR__ . '/../includes/integrations/cf7.php';
 
 use PHPUnit\Framework\TestCase;

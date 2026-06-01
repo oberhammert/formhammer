@@ -1,4 +1,7 @@
 vendor/
+.local/
+codex.md
+spec.md
 .DS_Store
 .phpunit.result.cache
 .wp-env.json

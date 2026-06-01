@@ -1,4 +1,15 @@
 <?php
+/*
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License as
+ * published by the Free Software Foundation; either version 2 of
+ * the License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU General Public License for more details.
+ */
 
 declare(strict_types=1);
 
@@ -33,7 +44,7 @@ final class Formhammer_CF7_Integration
             return $result;
         }
 
-        $validation = formhammer_validate($_POST, $this->form_id());
+        $validation = formhammer_validate(Formhammer_Validator::sanitize_post_data($_POST), $this->form_id());
 
         if (in_array($validation->verdict(), ['BLOCK', 'REJECT'], true)) {
             $result->invalidate($tags[0] ?? '', __('Submission blocked.', 'formhammer'));
@@ -68,8 +79,10 @@ final class Formhammer_CF7_Integration
 
     private function form_id(): string
     {
-        if (isset($_POST['_wpcf7']) && is_numeric($_POST['_wpcf7'])) {
-            return 'cf7-' . (string) (int) $_POST['_wpcf7'];
+        $posted_form_id = isset($_POST['_wpcf7']) ? absint(wp_unslash($_POST['_wpcf7'])) : 0;
+
+        if ($posted_form_id > 0) {
+            return 'cf7-' . (string) $posted_form_id;
         }
 
         if ($this->contact_form !== null && method_exists($this->contact_form, 'id')) {

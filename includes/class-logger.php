@@ -1,4 +1,15 @@
 <?php
+/*
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License as
+ * published by the Free Software Foundation; either version 2 of
+ * the License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU General Public License for more details.
+ */
 
 declare(strict_types=1);
 
@@ -50,6 +61,7 @@ final class Formhammer_Logger
             return;
         }
 
+        // $wpdb->insert() handles escaping; no raw query fallback needed.
         $this->wpdb->insert(
             $this->table_name(),
             [
@@ -72,12 +84,11 @@ final class Formhammer_Logger
         $cutoff = gmdate('Y-m-d H:i:s', ($this->clock)() - ($retention_days * self::DAY_IN_SECONDS));
         $query = sprintf('DELETE FROM %s WHERE logged_at < %%s', $this->table_name());
 
-        if (method_exists($this->wpdb, 'prepare')) {
-            $query = $this->wpdb->prepare($query, $cutoff);
-        } else {
-            $query = str_replace('%s', "'" . $cutoff . "'", $query);
+        if (!method_exists($this->wpdb, 'prepare')) {
+            return;
         }
 
+        $query = $this->wpdb->prepare($query, $cutoff);
         $this->wpdb->query($query);
     }
 

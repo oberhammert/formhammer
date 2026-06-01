@@ -1,4 +1,15 @@
 <?php
+/*
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License as
+ * published by the Free Software Foundation; either version 2 of
+ * the License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU General Public License for more details.
+ */
 
 declare(strict_types=1);
 
@@ -25,7 +36,7 @@ final class Formhammer_Elementor_Integration
             return;
         }
 
-        $validation = formhammer_validate($_POST, $this->validation_form_id($record));
+        $validation = formhammer_validate(Formhammer_Validator::sanitize_post_data($_POST), $this->validation_form_id($record));
 
         if (in_array($validation->verdict(), ['BLOCK', 'REJECT'], true)) {
             $ajax_handler->add_error_message(__('Submission blocked.', 'formhammer'));

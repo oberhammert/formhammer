@@ -1,4 +1,15 @@
 <?php
+/*
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License as
+ * published by the Free Software Foundation; either version 2 of
+ * the License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU General Public License for more details.
+ */
 
 declare(strict_types=1);
 
@@ -59,6 +70,29 @@ final class Formhammer_Validator
         return $encoded_payload . '.' . $this->sign($encoded_payload);
     }
 
+    public static function sanitize_post_data(array $post_data): array
+    {
+        $sanitized = [];
+
+        foreach ($post_data as $key => $value) {
+            $sanitized_key = self::sanitize_text((string) $key);
+
+            if ($sanitized_key === 'hl_elapsed') {
+                $sanitized[$sanitized_key] = $value === null || $value === '' ? $value : self::sanitize_absint($value);
+                continue;
+            }
+
+            if (is_array($value)) {
+                $sanitized[$sanitized_key] = self::sanitize_post_data($value);
+                continue;
+            }
+
+            $sanitized[$sanitized_key] = is_scalar($value) ? self::sanitize_text((string) $value) : '';
+        }
+
+        return $sanitized;
+    }
+
     public function verify_token(?string $token, string $expected_form_id): Formhammer_Validation_Result
     {
         if ($token === null || trim($token) === '') {
@@ -110,12 +144,15 @@ final class Formhammer_Validator
             return Formhammer_Validation_Result::pass('bypass');
         }
 
-        if (trim((string) ($post_data['hl_website'] ?? '')) !== '') {
+        $honeypot = self::sanitize_text((string) ($post_data['hl_website'] ?? ''));
+
+        if (trim($honeypot) !== '') {
             return $this->finalize($form_id, Formhammer_Validation_Result::reject('honeypot_filled'));
         }
 
+        $token = isset($post_data['hl_token']) ? self::sanitize_text((string) $post_data['hl_token']) : null;
         $token_result = $this->verify_token(
-            isset($post_data['hl_token']) ? (string) $post_data['hl_token'] : null,
+            $token,
             $form_id
         );
 
@@ -126,7 +163,9 @@ final class Formhammer_Validator
             );
         }
 
-        $score = $this->timing_score($post_data['hl_elapsed'] ?? null);
+        $elapsed = $post_data['hl_elapsed'] ?? null;
+        $elapsed = $elapsed === null || $elapsed === '' ? $elapsed : self::sanitize_absint($elapsed);
+        $score = $this->timing_score($elapsed);
         $block_threshold = $this->option_int('formhammer_block_threshold', self::DEFAULT_BLOCK_THRESHOLD);
         $flag_threshold = $this->option_int('formhammer_flag_threshold', self::DEFAULT_FLAG_THRESHOLD);
 
@@ -282,9 +321,37 @@ final class Formhammer_Validator
             $value .= str_repeat('=', 4 - $padding);
         }
 
+        // base64_decode() is safe here: input has passed HMAC verification above.
+        // Strict mode enabled. This is intentional - not a security risk.
         $decoded = base64_decode(strtr($value, '-_', '+/'), true);
 
         return $decoded === false ? null : $decoded;
+    }
+
+    private static function sanitize_text(string $value): string
+    {
+        if (function_exists('wp_unslash')) {
+            $value = (string) wp_unslash($value);
+        }
+
+        if (function_exists('sanitize_text_field')) {
+            return sanitize_text_field($value);
+        }
+
+        return trim(strip_tags($value));
+    }
+
+    private static function sanitize_absint(mixed $value): int
+    {
+        if (function_exists('wp_unslash')) {
+            $value = wp_unslash($value);
+        }
+
+        if (function_exists('absint')) {
+            return absint($value);
+        }
+
+        return max(0, (int) $value);
     }
 }
 

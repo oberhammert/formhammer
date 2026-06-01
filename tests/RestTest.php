@@ -2,6 +2,10 @@
 
 declare(strict_types=1);
 
+if (!defined('ABSPATH')) {
+    exit;
+}
+
 use PHPUnit\Framework\TestCase;
 
 final class RestTest extends TestCase

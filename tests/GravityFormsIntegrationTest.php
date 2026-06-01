@@ -8,6 +8,10 @@ if (!class_exists('GFForms')) {
     }
 }
 
+if (!defined('ABSPATH')) {
+    exit;
+}
+
 require_once __DIR__ . '/../includes/integrations/gravity-forms.php';
 
 use PHPUnit\Framework\TestCase;

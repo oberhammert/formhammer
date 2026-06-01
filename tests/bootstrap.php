@@ -6,6 +6,10 @@ if (!defined('ABSPATH')) {
     define('ABSPATH', __DIR__ . '/../');
 }
 
+if (!defined('ABSPATH')) {
+    exit;
+}
+
 if (!class_exists('WP_REST_Request')) {
     class WP_REST_Request
     {

@@ -1,4 +1,15 @@
 <?php
+/*
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License as
+ * published by the Free Software Foundation; either version 2 of
+ * the License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU General Public License for more details.
+ */
 
 declare(strict_types=1);
 
@@ -11,7 +22,7 @@ final class Formhammer_REST
     private const NAMESPACE = 'formhammer/v1';
     private const TOKEN_ROUTE = '/token';
     private const MAX_FORM_ID_LENGTH = 100;
-    private const RATE_LIMIT_MAX_REQUESTS = 10;
+    private const RATE_LIMIT_MAX_REQUESTS = 20;
     private const RATE_LIMIT_WINDOW = 60;
 
     public function __construct(private Formhammer_Validator $validator)
@@ -20,6 +31,8 @@ final class Formhammer_REST
 
     public function register_routes(): void
     {
+        // Public frontend forms fetch visitor tokens from this endpoint.
+        // Keep it unauthenticated, but enforce same-site Origin/Referer and IP rate limits.
         register_rest_route(
             self::NAMESPACE,
             self::TOKEN_ROUTE,
@@ -39,6 +52,14 @@ final class Formhammer_REST
 
     public function handle_token_request(WP_REST_Request $request): mixed
     {
+        if (!$this->is_allowed_origin()) {
+            return new WP_Error(
+                'formhammer_invalid_origin',
+                'Invalid request origin.',
+                ['status' => 403]
+            );
+        }
+
         if (!$this->check_rate_limit()) {
             return new WP_Error(
                 'formhammer_rate_limit_exceeded',
@@ -105,7 +126,7 @@ final class Formhammer_REST
             return true;
         }
 
-        $key = 'formhammer_token_rate_' . hash('sha256', $this->client_ip());
+        $key = 'formhammer_rl_' . md5($this->client_ip());
         $count = get_transient($key);
 
         if ($count === false) {
@@ -130,5 +151,34 @@ final class Formhammer_REST
         $ip = $_SERVER['REMOTE_ADDR'] ?? 'unknown';
 
         return is_string($ip) && $ip !== '' ? $ip : 'unknown';
+    }
+
+    private function is_allowed_origin(): bool
+    {
+        if (!function_exists('get_site_url') || !function_exists('wp_parse_url')) {
+            return true;
+        }
+
+        $site_host = wp_parse_url(get_site_url(), PHP_URL_HOST);
+        if (!is_string($site_host) || $site_host === '') {
+            return false;
+        }
+
+        $origin = $_SERVER['HTTP_ORIGIN'] ?? '';
+        $referer = $_SERVER['HTTP_REFERER'] ?? '';
+
+        foreach ([$origin, $referer] as $candidate) {
+            if (!is_string($candidate) || $candidate === '') {
+                continue;
+            }
+
+            $host = wp_parse_url($candidate, PHP_URL_HOST);
+
+            if (is_string($host) && strcasecmp($host, $site_host) === 0) {
+                return true;
+            }
+        }
+
+        return false;
     }
 }

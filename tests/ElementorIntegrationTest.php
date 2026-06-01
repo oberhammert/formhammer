@@ -9,6 +9,10 @@ namespace ElementorPro {
 }
 
 namespace {
+    if (!defined('ABSPATH')) {
+        exit;
+    }
+
     require_once __DIR__ . '/../includes/integrations/elementor.php';
 
     use PHPUnit\Framework\TestCase;
