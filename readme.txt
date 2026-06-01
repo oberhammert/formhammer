@@ -43,6 +43,10 @@ It is designed to stop common automated spam bots and low-effort spam submission
 = Will it stop advanced attacks? =
 No. It is not a defense against targeted headless browser attacks or sophisticated manual abuse.
 
+== Screenshots ==
+1. Formhammer settings page in wp-admin. (`screenshot-1.png`)
+2. Plugins screen showing Formhammer active. (`screenshot-2.png`)
+
 == Changelog ==
 = 1.0.0 =
 * Initial public release.
